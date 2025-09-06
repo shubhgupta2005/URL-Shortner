@@ -6,130 +6,149 @@ from io import BytesIO
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="QuickLink Shortener",
-    page_icon="✨",
+    page_title="QuickLinkz",
+    page_icon="🔗",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# --- Custom CSS for Styling ---
+# --- Initialize Session State for History ---
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+# --- Custom CSS for Advanced Styling ---
 st.markdown("""
 <style>
-    /* General Body Styling */
-    body {
-        background-color: #f0f2f6; /* Fallback color */
+    /* Animated Gradient Background */
+    @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
-    
+    .stApp {
+        background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+    }
+
     /* Main container with glassmorphism effect */
     .main-container {
-        background: rgba(255, 255, 255, 0.6);
+        background: rgba(255, 255, 255, 0.2);
         border-radius: 15px;
         padding: 2rem;
         box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-        backdrop-filter: blur(8.5px);
-        -webkit-backdrop-filter: blur(8.5px);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.18);
+        color: #FFFFFF; /* White text for better contrast */
     }
-    
+
+    /* Make titles and text more visible on the gradient */
+    h1, h2, h3, h4, h5, h6, p, label {
+        color: #FFFFFF !important;
+    }
+    .stMarkdown {
+        color: #FFFFFF !important;
+    }
+
     /* Styling for the output box */
     .output-box {
-        background-color: #e8e8e8;
-        border-left: 5px solid #1E90FF;
-        padding: 10px 20px;
-        border-radius: 8px;
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 15px;
+        border-radius: 10px;
         margin-top: 1rem;
+        border-left: 5px solid #00FF7F; /* Bright green accent */
+    }
+
+    /* Style the text area to show the link */
+    .stTextArea textarea {
         font-family: 'Courier New', Courier, monospace;
         font-weight: bold;
-    }
-    
-    /* Styling for buttons */
-    .stButton>button {
-        width: 100%;
-        border-radius: 10px;
-        border: 1px solid #1E90FF;
-        background-color: #1E90FF;
+        font-size: 1.1rem;
+        background-color: rgba(255, 255, 255, 0.1);
         color: white;
-    }
-    .stButton>button:hover {
-        background-color: #0073e6;
-        color: white;
-        border: 1px solid #0073e6;
     }
 
 </style>
 """, unsafe_allow_html=True)
 
-
 # --- App Header ---
-st.title("✨ QuickLink URL Shortener")
-st.markdown("Transform long, cumbersome URLs into short, shareable links in an instant!")
+st.markdown("<div class='main-container'>", unsafe_allow_html=True)
+st.title("🔗 QuickLinkz")
+st.markdown("Your friendly link shortening assistant. Create clean, memorable links in seconds.")
 
+# --- Main Application Form ---
+with st.form("shorten_form"):
+    long_url = st.text_input(
+        "Enter a long URL to shorten",
+        placeholder="https://www.example.com/...",
+        label_visibility="collapsed"
+    )
+    submitted = st.form_submit_button("✨ Shorten It!")
 
-# --- Main Application Logic ---
-with st.container():
-    st.markdown('<div class="main-container">', unsafe_allow_html=True)
+# --- Logic for Shortening and Displaying ---
+if submitted and long_url:
+    if not validators.url(long_url):
+        st.error("Oops! That doesn't look like a valid URL. Please include http:// or https://")
+    else:
+        with st.spinner("Brewing your short link..."):
+            try:
+                s = pyshorteners.Shortener()
+                short_url = s.tinyurl.short(long_url)
+                
+                # Add to history
+                st.session_state.history.insert(0, {"long": long_url, "short": short_url})
 
-    with st.form("shorten_form"):
-        long_url = st.text_input(
-            "Enter your long URL here",
-            placeholder="https://example.com/a-very-long-and-complex-url",
-            label_visibility="collapsed"
-        )
-        submitted = st.form_submit_button("Generate Short Link")
-
-    if submitted and long_url:
-        if not validators.url(long_url):
-            st.error("Please enter a valid URL, including http:// or https://")
-        else:
-            with st.spinner("Creating your magic link..."):
-                try:
-                    # Initialize the shortener and shorten the URL
-                    s = pyshorteners.Shortener()
-                    short_url = s.tinyurl.short(long_url)
-
-                    st.success("Success! Your link is ready.")
-
-                    # Display the shortened URL in a styled box
-                    st.markdown(f'<div class="output-box">{short_url}</div>', unsafe_allow_html=True)
-
-                    # Generate QR code
+                # --- Display Results ---
+                st.success("Your short link is ready!")
+                
+                st.text_area(
+                    "Shortened URL (easy to copy)",
+                    short_url,
+                    height=50,
+                    disabled=True,
+                    label_visibility="collapsed",
+                )
+                
+                # --- QR Code Section ---
+                with st.expander("📲 Get QR Code"):
                     qr_img = qrcode.make(short_url)
                     buf = BytesIO()
                     qr_img.save(buf, format="PNG")
                     byte_im = buf.getvalue()
 
-                    col1, col2 = st.columns([1, 0.4])
+                    st.image(byte_im, caption="Scan me!", width=120)
+                    st.download_button(
+                        label="Download QR Code",
+                        data=byte_im,
+                        file_name=f"qr_code_{short_url.split('/')[-1]}.png",
+                        mime="image/png"
+                    )
 
-                    with col1:
-                        # Add a download button for the QR code
-                        st.download_button(
-                            label="Download QR Code",
-                            data=byte_im,
-                            file_name="shortlink_qr.png",
-                            mime="image/png"
-                        )
-                    with col2:
-                        # Add a button to go to the URL
-                        st.link_button("Visit Link", short_url)
+            except Exception as e:
+                st.error(f"Something went wrong. Please try again. Details: {e}")
+elif submitted:
+    st.warning("Please enter a URL first!")
 
-                    # Display QR Code
-                    st.image(byte_im, caption="Scan me!", width=150)
+st.markdown('</div>', unsafe_allow_html=True)
 
-                except Exception as e:
-                    st.error(f"Could not shorten the URL. Please try again. Error: {e}")
 
-    elif submitted:
-        st.warning("You forgot to enter a URL!")
-
+# --- History Section ---
+if st.session_state.history:
+    st.markdown("<div class='main-container' style='margin-top: 2rem;'>", unsafe_allow_html=True)
+    st.subheader("📜 Your Recent Links")
+    for item in st.session_state.history:
+        with st.container():
+            st.markdown(f"**Original:** `{item['long']}`")
+            st.markdown(f"**Short:** <span class='output-box' style='display:inline-block; padding: 5px 10px;'>{item['short']}</span>", unsafe_allow_html=True)
+            st.divider()
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Footer ---
 st.markdown(
-    """
-    <div style='text-align: center; color: grey; margin-top: 2rem;'>
-        <p>Created by Shubh with Streamlit</p>
-    </div>
-    """,
+    "<div style='text-align: center; color: white; margin-top: 2rem; font-weight: bold;'>"
+    "<p>Made with ❤️ by Shubh</p>"
+    "</div>",
     unsafe_allow_html=True
 )
 
